@@ -5,6 +5,8 @@ import java.io._
 
 object Main extends App
 {
+//	println( Lexer.chrStream(new StringReader("a\nb"), 4).mkString(",") )
+	
 // 	val l =
 // 		new Lexer( 4 )
 // 		{
@@ -15,7 +17,8 @@ object Main extends App
 // 				} )
 // 			add( NumberLexeme )
 // 			ignore( new LineCommentLexeme("%") )
-// 			ignore( new BlockCommentLexeme("/*", "*/", "unclosed comment") )
+// 			ignore( new BlockCommentLexeme("/*", "*/") )
+// 			add( StringLexeme )
 // 			add(
 // 				new SymbolLexeme
 // 				{
@@ -26,10 +29,10 @@ object Main extends App
 // 					add( ")" )
 // 				} )
 // 			ignore( WhitespaceLexeme )
+// 			add( EOFLexeme )
 // 		}
 // 		
-// 	println( l.scan(new StringReader("1 a + **")).mkString(",") )
-//	println( Lexer.chrStream(new StringReader("a\nb"), 4).mkString(",") )
+// 	println( l.scan(new StringReader("""1 "as\\df" b""")).mkString(",") )
 	
 	val p =
 		new Parser[Any]( 4 )
@@ -47,5 +50,5 @@ object Main extends App
 			add(  200, 'xfy, "^" )
 		}
 		
-	println( p.parse(new StringReader("A = 123")) )
+	println( p.parse(new StringReader("""A = "123"""")) )
 }

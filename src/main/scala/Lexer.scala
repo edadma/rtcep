@@ -228,13 +228,104 @@ object VariableLexeme extends Lexeme
 			None
 }
 
+object StringLexeme extends Lexeme
+{
+// 	def delimited( tok: Any, end: String, s: Stream[Chr], unclosed: String,
+// 				   tr: StringBuilder => Either[String, String] = b => Right(b.toString) ): (Stream[Chr], Token) =
+// 	{
+// 	val buf = new StringBuilder
+// 	
+// 		def _consume( _s: Stream[Chr] ): (Stream[Chr], Token) =
+// 		{
+// 			consume( _s, end ) match
+// 			{
+// 				case None =>
+// 					if (_s.head.end)
+// 						_s.head.pos.error( unclosed )
+// 					else
+// 					{
+// 						buf += _s.head.ch
+// 						_consume( _s.tail )
+// 					}
+// 				case Some( _s1 ) =>
+// 					tr( buf ) match
+// 					{
+// 						case Left( error ) => s.head.pos.error( error )
+// 						case Right( res ) =>
+// 							(_s1, Token( tok, res, s.head.pos ))
+// 					}
+// 			}
+// 		}
+// 		
+// 		_consume( s )
+// 	}
+// 	
+// 	def escape( buf: StringBuilder ) =
+// 	{
+// 		for ((s, r) <- List("\\t" -> "\t", "\\n" -> "\n", "\\\\" -> "\\"))
+// 		{
+// 		var index = 0
+// 		var start = 0
+// 		
+// 			while ({start = buf.indexOf( s, index ); start > -1})
+// 			{
+// 				index = start + s.length
+// 				buf.replace( start, index, r )
+// 				index -= s.length - r.length
+// 			}
+// 		}
+// 		
+// 		buf.toString
+// 	}
+	
+	private val ESCAPEMAP =
+		Map(
+			't' -> '\t',
+			'n' -> '\n',
+			'\\' -> '\\'
+		)
+		
+	def token( s: Stream[Chr] ) =
+		if (s.head.ch != '"')
+			None
+		else
+		{
+		val buf = new StringBuilder
+		
+			def _token( _s: Stream[Chr] ): (Stream[Chr], Token) =
+			{
+				def enderror = _s.head.pos.error( "unexpected end of input in escape sequence" )
+				
+				_s.head.ch match
+				{
+					case EOF => _s.head.pos.error( "unclosed string literal" )
+					case '\\' =>
+						_s.tail.head.ch match
+						{
+							case EOF => enderror
+							case esc@('t'|'n'|'\\') => buf += ESCAPEMAP(esc)
+							case c => _s.tail.head.pos.error( "unrecognized escape character" )
+						}
+						
+						_token( _s.tail.tail )
+					case '"' => (_s.tail, Token( 'string, buf.toString, s.head.pos ))
+					case c =>
+						buf += c
+						_token( _s.tail )
+				}
+			}
+			
+			Some( _token(s.tail) )
+		}
+}
+
 object NumberLexeme extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		if (!s.head.ch.isDigit)
 			None
 		else
-			Some( consume('number, s, _.isDigit, error = "invalid literal number", notafter = c => c.isLetter || c == '_') )
+			Some( consume('number, s, _.isDigit, error = "invalid number literal", notafter = c => c.isLetter || c == '_') )
 }
 
 object WhitespaceLexeme extends Lexeme
@@ -256,7 +347,7 @@ class LineCommentLexeme( start: String ) extends Lexeme
 		}
 }
 
-class BlockCommentLexeme( start: String, end: String, error: String ) extends Lexeme
+class BlockCommentLexeme( start: String, end: String ) extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		consume( s, start ) match
@@ -266,7 +357,7 @@ class BlockCommentLexeme( start: String, end: String, error: String ) extends Le
 				def wade( _s: Stream[Chr] ): Stream[Chr] =
 				{
 					if (_s.head.end)
-						_s.head.pos.error( error )
+						_s.head.pos.error( "unclosed comment" )
 					else
 						consume( _s, end ) match
 						{
