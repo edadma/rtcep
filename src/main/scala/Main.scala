@@ -37,9 +37,13 @@ object Main extends App
 	val p =
 		new Parser[Any]( 4 )
 		{
-			def primary( value: Token ) = (value.kind, value.s)
+			def primary( value: Token ) = value.s
 			
-			def structure( functor: Token, args: IndexedSeq[Any] ) = (functor.s, args.mkString("[", ",", "]"))
+			def structure( functor: Token, args: IndexedSeq[Any] ) =
+				if (args.length == 1)
+					s"${functor.s}${args(0)}"
+				else
+					s"${functor.s}(${args.mkString(",")})"
 			
 			add( 1000, 'xfy, "," )
 			add(  700, 'xfx, "=", "\\=", "==", "=\\=" )
@@ -50,5 +54,5 @@ object Main extends App
 			add(  200, 'xfy, "^" )
 		}
 		
-	println( p.parse(new StringReader("""A = "123"""")) )
+	println( p.parse(new StringReader("""(1) 2""")) )
 }

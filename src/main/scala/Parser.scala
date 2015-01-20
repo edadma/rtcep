@@ -1,6 +1,6 @@
 package ca.hyperreal.rtcep
 
-import java.io._
+import java.io.{Reader, StringReader}
 
 import collection.mutable.{ArrayBuffer, ArrayStack, HashMap}
 
@@ -19,7 +19,7 @@ abstract class Parser[A]( tabs: Int )
 	private val symbol =
 		new SymbolLexeme
 		{
-			add( "(", ")" )
+			add( "(", ")", ".", "," )
 		}
 	private val l =
 		new Lexer( tabs )
@@ -89,7 +89,9 @@ abstract class Parser[A]( tabs: Int )
 		}
 	}
 	
-	def parse( r: Reader ) =
+	def parse( s: String ): A = parse( new StringReader(s) )
+	
+	def parse( r: Reader ): A =
 	{
 	val argstack = new ArrayStack[A]
 	
@@ -143,11 +145,14 @@ abstract class Parser[A]( tabs: Int )
 					opmap.get( k ) match
 					{
 						case None =>
+							if (prev != null && prev.isInstanceOf[Token])
+								tok.pos.error( "syntax error: expected operator" )
+								
 							prev = tok
 							argstack push primary( tok )
 						case Some( map ) =>
 							val op =
-								if (prev.isInstanceOf[Token] || prev.asInstanceOf[Operation].fixity == 'postfix)
+								if (prev != null && (prev.isInstanceOf[Token] || prev.asInstanceOf[Operation].fixity == 'postfix))
 									map.get('infix) match
 									{
 										case None =>

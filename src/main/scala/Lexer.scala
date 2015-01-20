@@ -80,7 +80,28 @@ abstract class Lexeme
 			skip( s.tail, chars - 1 )
 		else
 			s
-			
+	
+	def consume( s: Stream[Chr], chars: Int ): Option[(String, Stream[Chr])] =
+	{
+	val buf = new StringBuilder
+	
+		def _consume( _s: Stream[Chr], chars: Int ): Option[(String, Stream[Chr])] =
+		{
+			if (chars > 0)
+				_s.head.ch match
+				{
+					case EOF => None
+					case c =>
+						buf += c
+						_consume( _s.tail, chars - 1 )
+				}
+			else
+				Some( (buf.toString, _s) )
+		}
+		
+		_consume( s, chars )
+	}
+	
 	def consume( s: Stream[Chr], str: String ) =
 	{
 	val it = str.iterator
@@ -303,8 +324,8 @@ object StringLexeme extends Lexeme
 						_s.tail.head.ch match
 						{
 							case EOF => enderror
-							case esc@('t'|'n'|'\\') => buf += ESCAPEMAP(esc)
-							case c => _s.tail.head.pos.error( "unrecognized escape character" )
+							case c if ESCAPEMAP contains c => buf += ESCAPEMAP(c)
+							case _ => _s.tail.head.pos.error( "unrecognized escape character" )
 						}
 						
 						_token( _s.tail.tail )
