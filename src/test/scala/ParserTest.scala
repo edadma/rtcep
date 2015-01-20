@@ -6,7 +6,7 @@ import prop.PropertyChecks
 
 class ParserTest extends FreeSpec with PropertyChecks with Matchers
 {
-	val p = SimpleParser
+	val p = TestParser
 	
 	val ERROR = "(.*) \\(.*\n.*\n.*"r
 	

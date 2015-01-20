@@ -69,19 +69,19 @@ abstract class Lexeme
 	
 	private val EMPTYMAP = Map.empty[String, Any]
 	
-	def skip( s: Stream[Chr], cond: Char => Boolean ): Stream[Chr] =
+	protected def skip( s: Stream[Chr], cond: Char => Boolean ): Stream[Chr] =
 		if (cond( s.head.ch ))
 			skip( s.tail, cond )
 		else
 			s
 	
-	def skip( s: Stream[Chr], chars: Int ): Stream[Chr] =
+	protected def skip( s: Stream[Chr], chars: Int ): Stream[Chr] =
 		if (chars > 0)
 			skip( s.tail, chars - 1 )
 		else
 			s
 	
-	def consume( s: Stream[Chr], chars: Int ): Option[(String, Stream[Chr])] =
+	protected def consume( s: Stream[Chr], chars: Int ): Option[(String, Stream[Chr])] =
 	{
 	val buf = new StringBuilder
 	
@@ -102,7 +102,7 @@ abstract class Lexeme
 		_consume( s, chars )
 	}
 	
-	def consume( s: Stream[Chr], str: String ) =
+	protected def consume( s: Stream[Chr], str: String ) =
 	{
 	val it = str.iterator
 	
@@ -118,8 +118,7 @@ abstract class Lexeme
 		_consume( s )
 	}
 	
-	def consume( kind: Any, s: Stream[Chr], cond: Char => Boolean,
-				prefix: String = "",
+	protected def consume( kind: Any, s: Stream[Chr], cond: Char => Boolean,
 				error: String = "invalid token",
 				matcher: Regex = null,
 				mapping: collection.Map[String, Any] = EMPTYMAP,
@@ -151,7 +150,7 @@ abstract class Lexeme
 					{
 						case 0 => (m.group( 0 ), skip( s, m.group(0).length ))
 						case 1 => (m.group( 1 ), skip( s, m.group(1).length ))
-						case g => sys.error( s"matcher '$matcher' had $g capturing groups" )
+						case g => sys.error( s"matcher '$matcher' has $g capturing groups" )
 					}
 			}
 			
@@ -160,19 +159,25 @@ abstract class Lexeme
 			
 		mapping.get(v1) match
 		{
-			case None => (s2, Token( kind, prefix + v1, s.head.pos ))
-			case Some( sym ) => (s2, Token( sym, prefix + v1, s.head.pos ))
+			case None => (s2, Token( kind, v1, s.head.pos ))
+			case Some( sym ) => (s2, Token( sym, v1, s.head.pos ))
 		}
 	}
 
 	private val ESCAPEMAP =
 		Map(
 			't' -> '\t',
+			'r' -> '\r',
 			'n' -> '\n',
+			'f' -> '\f',
+			'b' -> '\b',
+			'"' -> '"',
+			'\'' -> '\'',
+			'`' -> '`',
 			'\\' -> '\\'
 		)
 
-	def consume( tok: Any, s: Stream[Chr], delim: Char ): (Stream[Chr], Token) =
+	protected def consume( tok: Any, s: Stream[Chr], delim: Char ): (Stream[Chr], Token) =
 	{
 	val buf = new StringBuilder
 	
@@ -216,6 +221,22 @@ abstract class Lexeme
 		}
 		
 		_token( s )
+	}
+	
+	protected def consume( s: Stream[Chr], allow: Char => Boolean ): (String, Stream[Chr]) =
+	{
+	val buf = new StringBuilder
+	
+		def _consume( _s: Stream[Chr] ): (String, Stream[Chr]) =
+			if (allow( _s.head.ch ))
+			{
+				buf += _s.head.ch
+				_consume( _s.tail )
+			}
+			else
+				(buf.toString, _s)
+				
+		_consume( s )
 	}
 
 	def token( s: Stream[Chr] ): Option[(Stream[Chr], Token)]
@@ -321,10 +342,36 @@ class StringLexeme( tok: Any, delim: Char ) extends Lexeme
 class IntegerLexeme( tok: Any ) extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
-		if (!s.head.ch.isDigit)
+		if (s.head.ch.isDigit)
+			Some( consume(tok, s, _.isDigit, error = "invalid integer literal", notafter = c => c.isLetter || c == '_') )
+		else
+			None
+}
+
+class FloatingLexeme( tok: Any ) extends Lexeme
+{
+	private val FLOATCHARS = ('0' to '9').toSet + 'e' + 'E' + '.' + '+' + '-'
+	private val FLOATMATCHER = """\d+?\.\d+(?:(?:E|e)(?:\+|\-)?\d+)?|\d+(?:E|e)(?:\+|\-)?\d+"""r
+	
+	def token( s: Stream[Chr] ) =
+	{
+	val (str, _) = consume( s, FLOATCHARS(_) )
+	
+		if (str == "")
 			None
 		else
-			Some( consume(tok, s, _.isDigit, error = "invalid integer literal", notafter = c => c.isLetter || c == '_') )
+		{
+			FLOATMATCHER.findPrefixMatchOf( str ) match
+			{
+				case None => None
+				case Some( m ) =>
+					val d = m.group( 0 )
+					val rest = skip( s, d.length )
+					
+					Some( (rest, Token( tok, d, s.head.pos )) )
+			}
+		}
+	}
 }
 
 object WhitespaceLexeme extends Lexeme

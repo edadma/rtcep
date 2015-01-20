@@ -34,7 +34,7 @@ object Main extends App
 // 		
 // 	println( l.scan(new StringReader("""1 "as\\df" b""")).mkString(",") )
 	
-	val p = SimpleParser
+	val p = TestParser
 		
 	def parse( s: String ) =
 		try
@@ -46,5 +46,5 @@ object Main extends App
 			case e: Exception => e.getMessage
 		}
 	
-	println( parse(""" 1+(A+asdf) """) )
+	println( parse(""" 15e1+1 """) )
 }

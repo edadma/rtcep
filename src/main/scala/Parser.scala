@@ -5,13 +5,14 @@ import java.io.{Reader, StringReader}
 import collection.mutable.{ArrayBuffer, ArrayStack, HashMap}
 
 
-object SimpleParser extends AbstractPrologParser[String]
+object TestParser extends AbstractPrologParser[String]
 {
 	def primary( value: Token ) =
 		value.kind match
 		{
 			case 'atom => "'" + value.s + "'"
 			case 'charlist => '"' + value.s + '"'
+//			case 'float => '#' + value.s
 			case _ => value.s
 		}
 	
@@ -50,6 +51,7 @@ abstract class AbstractParser[A]( tabs: Int ) extends Parser[A]
 			add( new StringLexeme('atom, '\'') )
 			add( new StringLexeme('charlist, '"') )
 			add( new StringLexeme('string, '`') )
+			add( new FloatingLexeme('float) )
 			add( new IntegerLexeme('integer) )
 			add( new VariableLexeme('variable) )
 			ignore( new LineCommentLexeme("%") )
