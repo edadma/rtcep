@@ -35,11 +35,11 @@ object Main extends App
 // 	println( l.scan(new StringReader("""1 "as\\df" b""")).mkString(",") )
 	
 	val p =
-		new Parser[Any]( 4 )
+		new Parser[String]( 4 )
 		{
 			def primary( value: Token ) = value.s
 			
-			def structure( functor: Token, args: IndexedSeq[Any] ) =
+			def structure( functor: Token, args: IndexedSeq[String] ) =
 				if (args.length == 1)
 					s"${functor.s}${args(0)}"
 				else
@@ -54,5 +54,15 @@ object Main extends App
 			add(  200, 'xfy, "^" )
 		}
 		
-	println( p.parse(new StringReader("""(1) 2""")) )
+	def parse( s: String ) =
+		try
+		{
+			p.parse( s )
+		}
+		catch
+		{
+			case e: Exception => e.getMessage
+		}
+	
+	println( parse("1+2") )
 }

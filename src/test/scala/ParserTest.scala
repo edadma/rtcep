@@ -7,11 +7,11 @@ import prop.PropertyChecks
 class ParserTest extends FreeSpec with PropertyChecks with Matchers
 {
 	val p =
-		new Parser[Any]( 4 )
+		new Parser[String]( 4 )
 		{
 			def primary( value: Token ) = value.s
 			
-			def structure( functor: Token, args: IndexedSeq[Any] ) =
+			def structure( functor: Token, args: IndexedSeq[String] ) =
 				if (args.length == 1)
 					s"${functor.s}${args(0)}"
 				else
@@ -26,14 +26,27 @@ class ParserTest extends FreeSpec with PropertyChecks with Matchers
 			add(  200, 'xfy, "^" )
 		}
 		
+	val ERROR = "(.*) \\(.*\n.*\n.*"r
+	
+	def parse( s: String ) =
+		try
+		{
+			p.parse( s )
+		}
+		catch
+		{
+			case e: Exception => e.getMessage match {case ERROR(msg) => msg}
+		}
+	
 	"basic" in
 	{
-		p.parse( "1+2" ) shouldBe "+(1,2)"
-		p.parse( "1+2*3" ) shouldBe "+(1,*(2,3))"
-		p.parse( "(1+2)*3" ) shouldBe "*(+(1,2),3)"
-		p.parse( "-1^2" ) shouldBe "-^(1,2)"
-		p.parse( "1^-2" ) shouldBe "^(1,-2)"
-		p.parse( "1!" ) shouldBe "!1"
-		p.parse( "-1!" ) shouldBe "-!1"
+		parse( "1+2" ) shouldBe "+(1,2)"
+		parse( "1+2*3" ) shouldBe "+(1,*(2,3))"
+		parse( "(1+2)*3" ) shouldBe "*(+(1,2),3)"
+		parse( "-1^2" ) shouldBe "-^(1,2)"
+		parse( "1^-2" ) shouldBe "^(1,-2)"
+		parse( "1!" ) shouldBe "!1"
+		parse( "-1!" ) shouldBe "-!1"
+		parse( "1 2" ) shouldBe "syntax error: expected operator"
 	}
 }

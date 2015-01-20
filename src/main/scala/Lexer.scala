@@ -319,16 +319,32 @@ object StringLexeme extends Lexeme
 				
 				_s.head.ch match
 				{
-					case EOF => _s.head.pos.error( "unclosed string literal" )
+					case EOF|'\n' => _s.head.pos.error( "unclosed string literal" )
 					case '\\' =>
 						_s.tail.head.ch match
 						{
 							case EOF => enderror
-							case c if ESCAPEMAP contains c => buf += ESCAPEMAP(c)
+							case c if ESCAPEMAP contains c =>
+								buf += ESCAPEMAP(c)
+								_token( _s.tail.tail )
+							case 'u' =>
+								consume( _s.tail.tail, 4 ) match
+								{
+									case None => enderror
+									case Some( (u, rest) ) =>
+										buf +=
+											(try
+											{
+												Integer.valueOf( u, 16 ).toChar
+											}
+											catch
+											{
+												case e: Exception => _s.tail.tail.head.pos.error( "invalid unicode value" )
+											})
+										_token( rest )
+								}
 							case _ => _s.tail.head.pos.error( "unrecognized escape character" )
 						}
-						
-						_token( _s.tail.tail )
 					case '"' => (_s.tail, Token( 'string, buf.toString, s.head.pos ))
 					case c =>
 						buf += c
@@ -471,7 +487,7 @@ object Lexer
 
 class Position( val line: Int, val col: Int, val s: String )
 {
-	def inLine = s + "\n" + " "*(col - 1) + "^"
+	def inLine = s + (if (s endsWith("\n")) "" else "\n") + " "*(col - 1) + "^"
 	
 	def error( msg: String ) = sys.error( msg + " " + this + "\n" + inLine )
 	

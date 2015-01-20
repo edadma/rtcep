@@ -218,8 +218,8 @@ abstract class Parser[A]( tabs: Int )
 		
 		argstack.pop
 	}
+
+	case class Operator( tok: Any, prec: Int, assoc: Symbol )
+
+	case class Operation( tok: Token, prec: Int, assoc: Symbol, fixity: Symbol )
 }
-
-case class Operator( tok: Any, prec: Int, assoc: Symbol )
-
-case class Operation( tok: Token, prec: Int, assoc: Symbol, fixity: Symbol )
