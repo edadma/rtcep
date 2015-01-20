@@ -164,7 +164,60 @@ abstract class Lexeme
 			case Some( sym ) => (s2, Token( sym, prefix + v1, s.head.pos ))
 		}
 	}
+
+	private val ESCAPEMAP =
+		Map(
+			't' -> '\t',
+			'n' -> '\n',
+			'\\' -> '\\'
+		)
+
+	def consume( tok: Any, s: Stream[Chr], delim: Char ): (Stream[Chr], Token) =
+	{
+	val buf = new StringBuilder
 	
+		def _token( _s: Stream[Chr] ): (Stream[Chr], Token) =
+		{
+			def enderror = _s.head.pos.error( "unexpected end of input in escape sequence" )
+			
+			_s.head.ch match
+			{
+				case EOF|'\n' => _s.head.pos.error( "unclosed string literal" )
+				case '\\' =>
+					_s.tail.head.ch match
+					{
+						case EOF => enderror
+						case c if ESCAPEMAP contains c =>
+							buf += ESCAPEMAP(c)
+							_token( _s.tail.tail )
+						case 'u' =>
+							consume( _s.tail.tail, 4 ) match
+							{
+								case None => enderror
+								case Some( (u, rest) ) =>
+									buf +=
+										(try
+										{
+											Integer.valueOf( u, 16 ).toChar
+										}
+										catch
+										{
+											case e: Exception => _s.tail.tail.head.pos.error( "invalid unicode value" )
+										})
+									_token( rest )
+							}
+						case _ => _s.tail.head.pos.error( "unrecognized escape character" )
+					}
+				case `delim` => (_s.tail, Token( tok, buf.toString, s.head.pos ))
+				case c =>
+					buf += c
+					_token( _s.tail )
+			}
+		}
+		
+		_token( s )
+	}
+
 	def token( s: Stream[Chr] ): Option[(Stream[Chr], Token)]
 }
 
@@ -177,7 +230,14 @@ object EOFLexeme extends Lexeme
 			None
 }
 
-class SymbolLexeme extends Lexeme
+trait KeywordLexeme
+{
+	def reserved( s: String ): Boolean
+	
+	def add( keys: String* )
+}
+
+class SymbolLexeme( tok: Any ) extends Lexeme with KeywordLexeme
 {
 	private val nonsymbol = (('\u0000' to ' ') ++ ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toSet
 	private val symbols = new HashMap[String, Any]
@@ -209,10 +269,10 @@ class SymbolLexeme extends Lexeme
 		if (nonsymbol(s.head.ch))
 			None
 		else
-			Some( consume('atom, s, !nonsymbol(_), matcher = regex, mapping = symbols) )
+			Some( consume(tok, s, !nonsymbol(_), matcher = regex, mapping = symbols) )
 }
 
-class AtomLexeme extends Lexeme
+class AtomLexeme( tok: Any ) extends Lexeme with KeywordLexeme
 {
 	private val lowercase = 'a' to 'z'
 	private val keywords = new HashMap[String, Symbol]
@@ -232,137 +292,39 @@ class AtomLexeme extends Lexeme
 	
 	def token( s: Stream[Chr] ) =
 		if (lowercase contains s.head.ch)
-			Some( consume('atom, s, ch => ch.isLetter || ch.isDigit || ch == '_', mapping = keywords) )
+			Some( consume(tok, s, ch => ch.isLetter || ch.isDigit || ch == '_', mapping = keywords) )
 		else
 			None
 }
 
-object VariableLexeme extends Lexeme
+class VariableLexeme( tok: Any ) extends Lexeme
 {
 	private val variableStart = ('A' to 'Z').toSet + '_'
 	private val variableRest = variableStart ++ ('0' to '9')
 	
 	def token( s: Stream[Chr] ) =
 		if (variableStart(s.head.ch))
-			Some( consume('variable, s, variableRest(_)) )
+			Some( consume(tok, s, variableRest(_)) )
 		else
 			None
 }
 
-object StringLexeme extends Lexeme
-{
-// 	def delimited( tok: Any, end: String, s: Stream[Chr], unclosed: String,
-// 				   tr: StringBuilder => Either[String, String] = b => Right(b.toString) ): (Stream[Chr], Token) =
-// 	{
-// 	val buf = new StringBuilder
-// 	
-// 		def _consume( _s: Stream[Chr] ): (Stream[Chr], Token) =
-// 		{
-// 			consume( _s, end ) match
-// 			{
-// 				case None =>
-// 					if (_s.head.end)
-// 						_s.head.pos.error( unclosed )
-// 					else
-// 					{
-// 						buf += _s.head.ch
-// 						_consume( _s.tail )
-// 					}
-// 				case Some( _s1 ) =>
-// 					tr( buf ) match
-// 					{
-// 						case Left( error ) => s.head.pos.error( error )
-// 						case Right( res ) =>
-// 							(_s1, Token( tok, res, s.head.pos ))
-// 					}
-// 			}
-// 		}
-// 		
-// 		_consume( s )
-// 	}
-// 	
-// 	def escape( buf: StringBuilder ) =
-// 	{
-// 		for ((s, r) <- List("\\t" -> "\t", "\\n" -> "\n", "\\\\" -> "\\"))
-// 		{
-// 		var index = 0
-// 		var start = 0
-// 		
-// 			while ({start = buf.indexOf( s, index ); start > -1})
-// 			{
-// 				index = start + s.length
-// 				buf.replace( start, index, r )
-// 				index -= s.length - r.length
-// 			}
-// 		}
-// 		
-// 		buf.toString
-// 	}
-	
-	private val ESCAPEMAP =
-		Map(
-			't' -> '\t',
-			'n' -> '\n',
-			'\\' -> '\\'
-		)
-		
+class StringLexeme( tok: Any, delim: Char ) extends Lexeme
+{	
 	def token( s: Stream[Chr] ) =
-		if (s.head.ch != '"')
-			None
+		if (s.head.ch == delim)
+			Some( consume(tok, s.tail, delim) )
 		else
-		{
-		val buf = new StringBuilder
-		
-			def _token( _s: Stream[Chr] ): (Stream[Chr], Token) =
-			{
-				def enderror = _s.head.pos.error( "unexpected end of input in escape sequence" )
-				
-				_s.head.ch match
-				{
-					case EOF|'\n' => _s.head.pos.error( "unclosed string literal" )
-					case '\\' =>
-						_s.tail.head.ch match
-						{
-							case EOF => enderror
-							case c if ESCAPEMAP contains c =>
-								buf += ESCAPEMAP(c)
-								_token( _s.tail.tail )
-							case 'u' =>
-								consume( _s.tail.tail, 4 ) match
-								{
-									case None => enderror
-									case Some( (u, rest) ) =>
-										buf +=
-											(try
-											{
-												Integer.valueOf( u, 16 ).toChar
-											}
-											catch
-											{
-												case e: Exception => _s.tail.tail.head.pos.error( "invalid unicode value" )
-											})
-										_token( rest )
-								}
-							case _ => _s.tail.head.pos.error( "unrecognized escape character" )
-						}
-					case '"' => (_s.tail, Token( 'string, buf.toString, s.head.pos ))
-					case c =>
-						buf += c
-						_token( _s.tail )
-				}
-			}
-			
-			Some( _token(s.tail) )
-		}
+			None
 }
 
-object NumberLexeme extends Lexeme
+class IntegerLexeme( tok: Any ) extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		if (!s.head.ch.isDigit)
 			None
 		else
-			Some( consume('number, s, _.isDigit, error = "invalid number literal", notafter = c => c.isLetter || c == '_') )
+			Some( consume(tok, s, _.isDigit, error = "invalid integer literal", notafter = c => c.isLetter || c == '_') )
 }
 
 object WhitespaceLexeme extends Lexeme

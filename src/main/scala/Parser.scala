@@ -5,36 +5,71 @@ import java.io.{Reader, StringReader}
 import collection.mutable.{ArrayBuffer, ArrayStack, HashMap}
 
 
-abstract class Parser[A]( tabs: Int )
+object SimpleParser extends AbstractPrologParser[String]
 {
-	def primary( value: Token ): A
-	
-	def structure( functor: Token, args: IndexedSeq[A] ): A
-	
-	private val atom =
-		new AtomLexeme
+	def primary( value: Token ) =
+		value.kind match
 		{
-			
+			case 'atom => "'" + value.s + "'"
+			case 'charlist => '"' + value.s + '"'
+			case _ => value.s
 		}
-	private val symbol =
-		new SymbolLexeme
+	
+	def structure( functor: Token, args: IndexedSeq[String] ) =
+		if (args.length == 1)
+			s"${functor.s}${args(0)}"
+		else
+			s"${functor.s}(${args.mkString(",")})"
+}
+
+abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
+{
+	symbols.add( "." )
+	add( 1000, 'xfy, "," )
+	add(  700, 'xfx, "=", "\\=", "==", "=\\=" )
+	add(  500, 'yfx, "+", "-" )
+	add(  400, 'yfx, "*", "/" )
+	add(  100, 'yf,  "!" )
+	add(  200,  'fy, "+", "-" )
+	add(  200, 'xfy, "^" )
+}
+
+abstract class AbstractParser[A]( tabs: Int ) extends Parser[A]
+{
+	protected val atoms = new AtomLexeme( 'atom )
+	protected val symbols =
+		new SymbolLexeme( 'atom )
 		{
-			add( "(", ")", ".", "," )
-		}
-	private val l =
-		new Lexer( tabs )
-		{
-			add( atom )
-			add( NumberLexeme )
-			add( VariableLexeme )
-			ignore( new LineCommentLexeme("%") )
-			ignore( new BlockCommentLexeme("/*", "*/") )
-			add( StringLexeme )
-			add( symbol )
-			ignore( WhitespaceLexeme )
-			add( EOFLexeme )
+			add( "(", ")", "," )
 		}
 		
+	override protected val lexer =
+		new Lexer( tabs )
+		{
+			add( atoms )
+			add( new StringLexeme('atom, '\'') )
+			add( new StringLexeme('charlist, '"') )
+			add( new StringLexeme('string, '`') )
+			add( new IntegerLexeme('integer) )
+			add( new VariableLexeme('variable) )
+			ignore( new LineCommentLexeme("%") )
+			ignore( new BlockCommentLexeme("/*", "*/") )
+			add( symbols )
+			ignore( WhitespaceLexeme )
+			add( EOFLexeme )
+		}	
+}
+
+abstract class Parser[A]
+{
+	protected def primary( value: Token ): A
+	
+	protected def structure( functor: Token, args: IndexedSeq[A] ): A
+	
+	protected val atoms: KeywordLexeme
+	protected val symbols: KeywordLexeme
+	protected val lexer: Lexer
+	
 	private val operators = new ArrayBuffer[Operator]
 	private val opmap = new HashMap[Any, Map[Symbol, Operator]]
 	
@@ -78,13 +113,13 @@ abstract class Parser[A]( tabs: Int )
 					
 			if (name.head.isLetter)
 			{
-				if (!atom.reserved( name ))
-					atom add name
+				if (!atoms.reserved( name ))
+					atoms add name
 			}
 			else
 			{
-				if (!symbol.reserved( name ))
-					symbol add name
+				if (!symbols.reserved( name ))
+					symbols add name
 			}
 		}
 	}
@@ -112,7 +147,7 @@ abstract class Parser[A]( tabs: Int )
 			}
 		
 	val opstack = new ArrayStack[Operation]
-	var toks = l.scan( r )
+	var toks = lexer.scan( r )
  	var prev: Any = null
 		
 		while (!toks.head.end)
