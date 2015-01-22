@@ -25,8 +25,9 @@ object TestParser extends AbstractPrologParser[String]
 
 abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
 {
-	symbols.add( "." )
-	add( 1000, 'xfy, "," )
+	symbols.add( ".", "[]", ",", "[", "]", "|" )
+ 	add( 1000, 'xfy, "," )
+// 	add(  900, 'xfx, "|" )
 	add(  700, 'xfx, "=", "\\=", "==", "=\\=" )
 	add(  500, 'yfx, "+", "-" )
 	add(  400, 'yfx, "*", "/" )
@@ -153,7 +154,8 @@ abstract class Parser[A]
 	val opstack = new ArrayStack[Operation]
 	var toks = lexer.scan( r )
  	var prev: Any = null
-		
+	val comma: Map[Symbol, Operator] = if (opmap contains ',') null else Map( 'infix -> Operator(',', 10000, 'xfy) )
+	
 		while (!toks.head.end)
 		{
 		val tok = toks.head
@@ -195,13 +197,13 @@ abstract class Parser[A]
 							o.buf += pop( optok )
 							val Value(t, _) = pop( optok )
 							
-							argstack push Value( t, structure( t, o.buf.toIndexedSeq ) )
+							argstack push Value( t, structure(t, o.buf.toIndexedSeq) )
 						case _ =>
 					}
 
 					prev = tok
 				case k =>
-					opmap.get( k ) match
+					(if (k == ',' && comma != null) Some( comma ) else opmap.get( k )) match
 					{
 						case None =>
 							if (prev != null && prev.isInstanceOf[Token])
@@ -263,7 +265,7 @@ abstract class Parser[A]
 								)
 								opstack push op 
 							else
-								op.tok.pos.error( "syntax error: operator priority clash" )
+								op.tok.pos.error( "syntax error: symbol priority clash" )
 					}
 			}
 		}
