@@ -46,5 +46,5 @@ object Main extends App
 			case e: Exception => e.getMessage
 		}
 	
-	println( parse(""" 15e1+1 """) )
+	println( parse(""" 1 + a( 1, 2 ) """) )
 }

@@ -16,11 +16,11 @@ object TestParser extends AbstractPrologParser[String]
 			case _ => value.s
 		}
 	
-	def structure( functor: Token, args: IndexedSeq[String] ) =
-		if (args.length == 1)
-			s"${functor.s}${args(0)}"
+	def structure( functor: Token, args: IndexedSeq[Value[String]] ) =
+		if (args.length == 1 && functor.kind != 'atom)
+			s"${functor.s}${args(0).v}"
 		else
-			s"${functor.s}(${args.mkString(",")})"
+			s"${functor.s}(${args.map(_.v).mkString(",")})"
 }
 
 abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
@@ -41,7 +41,7 @@ abstract class AbstractParser[A]( tabs: Int ) extends Parser[A]
 	protected val symbols =
 		new SymbolLexeme( 'atom )
 		{
-			add( "(", ")", "," )
+			add( "(", ")" )
 		}
 		
 	override protected val lexer =
@@ -66,7 +66,7 @@ abstract class Parser[A]
 {
 	protected def primary( value: Token ): A
 	
-	protected def structure( functor: Token, args: IndexedSeq[A] ): A
+	protected def structure( functor: Token, args: IndexedSeq[Value[A]] ): A
 	
 	protected val atoms: KeywordLexeme
 	protected val symbols: KeywordLexeme
@@ -130,13 +130,15 @@ abstract class Parser[A]
 	
 	def parse( r: Reader ): A =
 	{
-	val argstack = new ArrayStack[A]
+	val argstack = new ArrayStack[Value[A]]
 	
-		def pop1( tok: Token ) =
+		def pop( tok: Token ) =
 			if (argstack.isEmpty)
 				tok.pos.error( "syntax error: missing operand" )
 			else
-				IndexedSeq( argstack.pop )
+				argstack.pop
+				
+		def pop1( tok: Token ) = IndexedSeq( pop(tok) )
 		
 		def pop2( tok: Token ) =
 			if (argstack.size < 2)
@@ -161,23 +163,43 @@ abstract class Parser[A]
 			tok.kind match
 			{
 				case '(' =>
+					if (prev.isInstanceOf[Token])
+						if (prev.asInstanceOf[Token].kind == 'atom)
+							opstack push Operation( tok, 10000, null, 'str )
+						else
+							prev.asInstanceOf[Token].pos.error( "syntax error: expected atom or operator" )
+					else
+						opstack push Operation( tok, 10000, null, 'lparen )
+						
 					prev = null
-					opstack push Operation( tok, 10000, null, 'lparen )
 				case ')' =>
+					if (prev == null || prev.isInstanceOf[Operation] &&
+						(prev.asInstanceOf[Operation].fixity == 'infix || prev.asInstanceOf[Operation].fixity == 'prefix))
+						tok.pos.error( "syntax error: unexpected closing parenthesis" )
+						
 					while (!opstack.isEmpty && opstack.top.tok.kind != '(')
 					{
 						opstack.pop match
 						{
-							case Operation(optok, _, _, 'prefix) => argstack push structure( optok, pop1(optok) )
-							case Operation(optok, _, _, 'infix) => argstack push structure( optok, pop2(optok) )
+							case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
+							case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
 						}
 					}
-					
+
 					if (opstack.isEmpty)
 						tok.pos.error( "syntax error: unmatched closing parenthesis" )
-						
+					
+					opstack.pop match
+					{
+						case o@Operation(optok, _, _, 'str) =>
+							o.buf += pop( optok )
+							val Value(t, _) = pop( optok )
+							
+							argstack push Value( t, structure( t, o.buf.toIndexedSeq ) )
+						case _ =>
+					}
+
 					prev = tok
-					opstack.pop
 				case k =>
 					opmap.get( k ) match
 					{
@@ -186,7 +208,7 @@ abstract class Parser[A]
 								tok.pos.error( "syntax error: expected operator" )
 								
 							prev = tok
-							argstack push primary( tok )
+							argstack push Value( tok, primary(tok) )
 						case Some( map ) =>
 							val op =
 								if (prev != null && (prev.isInstanceOf[Token] || prev.asInstanceOf[Operation].fixity == 'postfix))
@@ -195,7 +217,7 @@ abstract class Parser[A]
 										case None =>
 											map.get('postfix) match
 											{
-												case None => tok.pos.error( "syntax error: unexpected prefix operator" )
+												case None => tok.pos.error( "syntax error: unexpected prefix symbol" )
 												case Some( o ) => Operation( tok, o.prec, o.assoc, 'postfix )
 											}
 										case Some( o ) => Operation( tok, o.prec, o.assoc, 'infix )
@@ -203,7 +225,8 @@ abstract class Parser[A]
 								else
 									map.get('prefix) match
 									{
-										case None => tok.pos.error( "syntax error: unexpected infix/postfix operator" )
+										case None =>
+											tok.pos.error( "syntax error: unexpected " + (if (map contains 'infix) "in" else "post") + "fix symbol" )
 										case Some( o ) => Operation( tok, o.prec, o.assoc, 'prefix )
 									}
 								
@@ -218,15 +241,17 @@ abstract class Parser[A]
 							{
 								opstack.pop match
 								{
-									case Operation(optok, _, _, 'prefix) => argstack push structure( optok, pop1(optok) )
-									case Operation(optok, _, _, 'infix) => argstack push structure( optok, pop2(optok) )
+									case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
+									case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
 								}
 							}
 							
 							prev = op
 							
-							if (op.fixity == 'postfix)
-								argstack push structure( op.tok, pop1(op.tok) )
+							if (op.tok.kind == ',' && !opstack.isEmpty && opstack.top.fixity == 'str)
+								opstack.top.buf += argstack.pop
+							else if (op.fixity == 'postfix)
+								argstack push Value( op.tok, structure( op.tok, pop1(op.tok) ) )
 							else if (opstack.isEmpty || opstack.top.tok.kind == '(' ||
 								(
 								opstack.top.assoc == 'yfx ||
@@ -247,16 +272,21 @@ abstract class Parser[A]
 		{
 			opstack.pop match
 			{
-				case Operation(optok, _, _, 'prefix) => argstack push structure( optok, pop1(optok) )
-				case Operation(optok, _, _, 'infix) => argstack push structure( optok, pop2(optok) )
+				case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
+				case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
 				case Operation(Token('(', _, pos), _, _, _) => pos.error( "syntax error: unmatched open parenthesis" )
 			}
 		}
 		
-		argstack.pop
+		argstack.pop.v
 	}
 
 	case class Operator( tok: Any, prec: Int, assoc: Symbol )
 
+	case class Value[A]( tok: Token, v: A )
+	
 	case class Operation( tok: Token, prec: Int, assoc: Symbol, fixity: Symbol )
+	{
+		lazy val buf = new ArrayBuffer[Value[A]]
+	}
 }
