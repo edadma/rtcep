@@ -12,23 +12,21 @@ object TestParser extends AbstractPrologParser[String]
 		{
 			case 'atom => "'" + value.s + "'"
 			case 'charlist => '"' + value.s + '"'
-//			case 'float => '#' + value.s
-//			case 'variable => "var:" + value.s
+			case 'string => '`' + value.s + '`'
 			case _ => value.s
 		}
 	
 	def structure( functor: Token, args: IndexedSeq[Value[String]] ) =
 		if (args.length == 1 && functor.kind != 'atom)
-			s"${functor.s}${args(0).v}"
+			functor.s + args(0).v
 		else
 			s"${functor.s}(${args.map(_.v).mkString(",")})"
 }
 
 abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
 {
-	symbols.add( ".", "[]", ",", "[", "]", "|" )
-//	add( 1000, 'xfy, "," )
-// 	add(  900, 'xfx, "|" )
+	symbols.add( ".", "[]", "[", "]", "|" )
+	add( 1000, 'xfy, "," )
 	add(  700, 'xfx, "=", "\\=", "==", "=\\=" )
 	add(  500, 'yfx, "+", "-" )
 	add(  400, 'yfx, "*", "/" )
@@ -131,9 +129,9 @@ abstract class Parser[A]
 		}
 	}
 	
-	def parse( s: String ): A = parse( new StringReader(s) )
+	def parse( s: String, endtok: Any ): (A, Stream[Token]) = parse( new StringReader(s), endtok )
 	
-	def parse( r: Reader ): A =
+	def parse( r: Reader, endtok: Any ): (A, Stream[Token]) =
 	{
 	val argstack = new ArrayStack[Value[A]]
 	
@@ -161,7 +159,7 @@ abstract class Parser[A]
 	val comma: Map[Symbol, Operator] = if (opmap contains ',') null else Map( 'infix -> Operator(',', 10000, 'xfy) )
 	val bar: Map[Symbol, Operator] = if (opmap contains '|') null else Map( 'infix -> Operator('|', 10000, 'xfx) )
 	
-		while (!toks.head.end)
+		while (!toks.head.end && toks.head.kind != endtok)
 		{
 		val tok = toks.head
 		
@@ -347,7 +345,10 @@ abstract class Parser[A]
 			}
 		}
 		
-		argstack.pop.v
+		if (argstack.size > 1)
+			toks.head.pos.error( "syntax error: more than one value on stack" )
+			
+		(argstack.pop.v, toks)
 	}
 
 	case class Operator( tok: Any, prec: Int, assoc: Symbol )
