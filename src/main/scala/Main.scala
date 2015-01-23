@@ -11,16 +11,17 @@ object Main extends App
 // 		new Lexer( 4 )
 // 		{
 // 			add(
-// 				new AtomLexeme
+// 				new AtomLexeme( 'atom )
 // 				{
 // 					add( "and" )
 // 				} )
-// 			add( NumberLexeme )
+// 			add( new VariableLexeme('variable) )
 // 			ignore( new LineCommentLexeme("%") )
 // 			ignore( new BlockCommentLexeme("/*", "*/") )
-// 			add( StringLexeme )
+// 			add( new IntegerLexeme('integer) )
+// 			add( new StringLexeme('string, '`') )
 // 			add(
-// 				new SymbolLexeme
+// 				new SymbolLexeme( 'atom )
 // 				{
 // 					add( "+" )
 // 					add( "*" )
@@ -32,7 +33,7 @@ object Main extends App
 // 			add( EOFLexeme )
 // 		}
 // 		
-// 	println( l.scan(new StringReader("""1 "as\\df" b""")).mkString(",") )
+// 	println( l.scan(new StringReader("""Var""")).mkString(",") )
 	
 	val p = TestParser
 		
@@ -43,8 +44,8 @@ object Main extends App
 		}
 		catch
 		{
-			case e: Exception => e.getMessage
+			case e: Exception => /*e.printStackTrace*/e.getMessage
 		}
 	
-	println( parse(""" a(1, 2) """) )
+	println( parse(""" [1|[2, 3|[4]]] """) )
 }

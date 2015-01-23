@@ -321,7 +321,7 @@ class AtomLexeme( tok: Any ) extends Lexeme with KeywordLexeme
 class VariableLexeme( tok: Any ) extends Lexeme
 {
 	private val variableStart = ('A' to 'Z').toSet + '_'
-	private val variableRest = variableStart ++ ('0' to '9')
+	private val variableRest = variableStart ++ ('a' to 'z') ++ ('0' to '9')
 	
 	def token( s: Stream[Chr] ) =
 		if (variableStart(s.head.ch))

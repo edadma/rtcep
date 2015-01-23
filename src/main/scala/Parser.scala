@@ -13,6 +13,7 @@ object TestParser extends AbstractPrologParser[String]
 			case 'atom => "'" + value.s + "'"
 			case 'charlist => '"' + value.s + '"'
 //			case 'float => '#' + value.s
+//			case 'variable => "var:" + value.s
 			case _ => value.s
 		}
 	
@@ -26,7 +27,7 @@ object TestParser extends AbstractPrologParser[String]
 abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
 {
 	symbols.add( ".", "[]", ",", "[", "]", "|" )
- 	add( 1000, 'xfy, "," )
+//	add( 1000, 'xfy, "," )
 // 	add(  900, 'xfx, "|" )
 	add(  700, 'xfx, "=", "\\=", "==", "=\\=" )
 	add(  500, 'yfx, "+", "-" )
@@ -72,6 +73,9 @@ abstract class Parser[A]
 	protected val atoms: KeywordLexeme
 	protected val symbols: KeywordLexeme
 	protected val lexer: Lexer
+	
+	protected val dotsym = Symbol( "." )
+	protected val nilsym = Symbol( "[]" )
 	
 	private val operators = new ArrayBuffer[Operator]
 	private val opmap = new HashMap[Any, Map[Symbol, Operator]]
@@ -155,6 +159,7 @@ abstract class Parser[A]
 	var toks = lexer.scan( r )
  	var prev: Any = null
 	val comma: Map[Symbol, Operator] = if (opmap contains ',') null else Map( 'infix -> Operator(',', 10000, 'xfy) )
+	val bar: Map[Symbol, Operator] = if (opmap contains '|') null else Map( 'infix -> Operator('|', 10000, 'xfx) )
 	
 		while (!toks.head.end)
 		{
@@ -164,16 +169,65 @@ abstract class Parser[A]
 
 			tok.kind match
 			{
+				case '[' =>
+					if (prev.isInstanceOf[Token])
+						prev.asInstanceOf[Token].pos.error( "syntax error: expected operator" )
+					else
+						opstack push Operation( tok, 10000, null, 'lst )
+						
+					prev = null
 				case '(' =>
 					if (prev.isInstanceOf[Token])
 						if (prev.asInstanceOf[Token].kind == 'atom)
-							opstack push Operation( tok, 10000, null, 'str )
+							opstack push Operation( tok, 10000, null, 'lst )
 						else
 							prev.asInstanceOf[Token].pos.error( "syntax error: expected atom or operator" )
 					else
 						opstack push Operation( tok, 10000, null, 'lparen )
 						
 					prev = null
+				case ']' =>
+					if (prev == null || prev.isInstanceOf[Operation] &&
+						(prev.asInstanceOf[Operation].fixity == 'infix || prev.asInstanceOf[Operation].fixity == 'prefix))
+						tok.pos.error( "syntax error: unexpected closing bracket" )
+						
+					while (!opstack.isEmpty && opstack.top.tok.kind != '[')
+					{
+						opstack.pop match
+						{
+							case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
+							case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
+						}
+					}
+
+					if (opstack.isEmpty)
+						tok.pos.error( "syntax error: unmatched closing bracket" )
+					
+					opstack.pop match
+					{
+						case o@Operation(optok, _, _, 'lst) =>
+							if (o.restflag)
+								o.rest = pop( optok )
+							else
+								o.buf += pop( optok )
+							
+							def list( l: List[Value[A]] ): Value[A] =
+								l match
+								{
+									case hd :: tl =>
+										Value( hd.tok, structure(Token(dotsym, ".", hd.tok.pos), IndexedSeq(hd, list(tl))) )
+									case Nil =>
+										if (o.restflag)
+											o.rest
+										else
+											Value( tok, primary(Token(nilsym, "[]", tok.pos)) )
+								}
+							
+							argstack push list( o.buf.toList )
+						case _ =>
+					}
+
+					prev = tok
 				case ')' =>
 					if (prev == null || prev.isInstanceOf[Operation] &&
 						(prev.asInstanceOf[Operation].fixity == 'infix || prev.asInstanceOf[Operation].fixity == 'prefix))
@@ -193,7 +247,7 @@ abstract class Parser[A]
 					
 					opstack.pop match
 					{
-						case o@Operation(optok, _, _, 'str) =>
+						case o@Operation(optok, _, _, 'lst) =>
 							o.buf += pop( optok )
 							val Value(t, _) = pop( optok )
 							
@@ -203,7 +257,14 @@ abstract class Parser[A]
 
 					prev = tok
 				case k =>
-					(if (k == ',' && comma != null) Some( comma ) else opmap.get( k )) match
+					(
+						if (k == ',' && comma != null)
+							Some( comma )
+						else if (k == '|' && bar != null)
+							Some( bar )
+						else
+							opmap.get( k )
+					) match
 					{
 						case None =>
 							if (prev != null && prev.isInstanceOf[Token])
@@ -250,7 +311,12 @@ abstract class Parser[A]
 							
 							prev = op
 							
-							if (op.tok.kind == ',' && !opstack.isEmpty && opstack.top.fixity == 'str)
+							if (op.tok.kind == '|' && !opstack.isEmpty && opstack.top.fixity == 'lst)
+							{
+								opstack.top.restflag = true
+								opstack.top.buf += argstack.pop
+							}
+							else if (op.tok.kind == ',' && !opstack.isEmpty && opstack.top.fixity == 'lst)
 								opstack.top.buf += argstack.pop
 							else if (op.fixity == 'postfix)
 								argstack push Value( op.tok, structure( op.tok, pop1(op.tok) ) )
@@ -277,6 +343,7 @@ abstract class Parser[A]
 				case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
 				case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
 				case Operation(Token('(', _, pos), _, _, _) => pos.error( "syntax error: unmatched open parenthesis" )
+				case Operation(Token('[', _, pos), _, _, _) => pos.error( "syntax error: unmatched open bracket" )
 			}
 		}
 		
@@ -290,5 +357,7 @@ abstract class Parser[A]
 	case class Operation( tok: Token, prec: Int, assoc: Symbol, fixity: Symbol )
 	{
 		lazy val buf = new ArrayBuffer[Value[A]]
+		var restflag = false
+		var rest: Value[A] = null
 	}
 }
