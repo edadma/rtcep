@@ -67,6 +67,18 @@ abstract class Parser[A]
 	protected def primary( value: Token ): A
 	
 	protected def structure( functor: Token, args: IndexedSeq[Value[A]] ): A
+							
+	protected def list( tok: Token, l: List[Value[A]], r: Value[A] ): Value[A] =
+		l match
+		{
+			case hd :: tl =>
+				Value( hd.tok, structure(Token(dotsym, ".", hd.tok.pos), IndexedSeq(hd, list(tok, tl, r))) )
+			case Nil =>
+				if (r != null)
+					r
+				else
+					Value( tok, primary(Token(nilsym, "[]", tok.pos)) )
+		}
 	
 	protected val atoms: KeywordLexeme
 	protected val symbols: KeywordLexeme
@@ -74,6 +86,8 @@ abstract class Parser[A]
 	
 	protected val dotsym = Symbol( "." )
 	protected val nilsym = Symbol( "[]" )
+	protected val intsym = 'integer
+	protected val lists = 'prolog // 'basic // 'none
 	
 	private val operators = new ArrayBuffer[Operator]
 	private val opmap = new HashMap[Any, Map[Symbol, Operator]]
@@ -157,7 +171,7 @@ abstract class Parser[A]
 	var toks = lexer.scan( r )
  	var prev: Any = null
 	val comma: Map[Symbol, Operator] = if (opmap contains ',') null else Map( 'infix -> Operator(',', 10000, 'xfy) )
-	val bar: Map[Symbol, Operator] = if (opmap contains '|') null else Map( 'infix -> Operator('|', 10000, 'xfx) )
+	val bar: Map[Symbol, Operator] = if (lists == 'prolog && opmap.contains( '|' )) null else Map( 'infix -> Operator('|', 10000, 'xfx) )
 	
 		while (!toks.head.end && toks.head.kind != endtok)
 		{
@@ -209,19 +223,7 @@ abstract class Parser[A]
 							else
 								o.buf += pop( optok )
 							
-							def list( l: List[Value[A]] ): Value[A] =
-								l match
-								{
-									case hd :: tl =>
-										Value( hd.tok, structure(Token(dotsym, ".", hd.tok.pos), IndexedSeq(hd, list(tl))) )
-									case Nil =>
-										if (o.restflag)
-											o.rest
-										else
-											Value( tok, primary(Token(nilsym, "[]", tok.pos)) )
-								}
-							
-							argstack push list( o.buf.toList )
+							argstack push list( tok, o.buf.toList, o.rest )
 						case _ =>
 					}
 
@@ -269,7 +271,11 @@ abstract class Parser[A]
 								tok.pos.error( "syntax error: expected operator" )
 								
 							prev = tok
-							argstack push Value( tok, primary(tok) )
+							
+							if (tok.kind == 'charlist)
+								argstack push list( tok, tok.s.map( c => Value(tok, primary(Token('intsym, c.toInt.toString, tok.pos))) ).toList, null )
+							else
+								argstack push Value( tok, primary(tok) )
 						case Some( map ) =>
 							val op =
 								if (prev != null && (prev.isInstanceOf[Token] || prev.asInstanceOf[Operation].fixity == 'postfix))
@@ -309,7 +315,7 @@ abstract class Parser[A]
 							
 							prev = op
 							
-							if (op.tok.kind == '|' && !opstack.isEmpty && opstack.top.fixity == 'lst)
+							if (op.tok.kind == '|' && !opstack.isEmpty && opstack.top.fixity == 'lst && lists == 'prolog)
 							{
 								opstack.top.restflag = true
 								opstack.top.buf += argstack.pop
