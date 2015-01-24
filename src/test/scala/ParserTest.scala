@@ -30,6 +30,16 @@ class ParserTest extends FreeSpec with PropertyChecks with Matchers
 		parse( "1^-2" ) shouldBe "^(1,-2)"
 		parse( "1!" ) shouldBe "!1"
 		parse( "-1!" ) shouldBe "-!1"
+	}
+	
+	"errors" in
+	{
 		parse( "1 2" ) shouldBe "syntax error: expected operator"
+	}
+	
+	"comments" in
+	{
+		parse( "123%asdf\n+2" ) shouldBe "+(123,2)"
+		parse( "123%asdf" ) shouldBe "123"
 	}
 }

@@ -69,12 +69,6 @@ abstract class Lexeme
 {
 	protected val JUNK = Token( null, null, null, null )
 	
-	protected def skip( s: Stream[Chr], cond: Char => Boolean ): Stream[Chr] =
-		if (cond( s.head.ch ))
-			skip( s.tail, cond )
-		else
-			s
-	
 	protected def skip( s: Stream[Chr], chars: Int ): Stream[Chr] =
 		if (chars > 0)
 			skip( s.tail, chars - 1 )
@@ -366,7 +360,7 @@ object WhitespaceLexeme extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		if (s.head.ch.isWhitespace)
-			Some( (skip(s.tail, _.isWhitespace), JUNK) )
+			Some( (Lexer.skip(s.tail, _.isWhitespace), JUNK) )
 		else
 			None
 }
@@ -377,7 +371,7 @@ class LineCommentLexeme( start: String ) extends Lexeme
 		consume( s, start ) match
 		{
 			case None => None
-			case Some( s1 ) => Some( (skip(s, _ != '\n'), JUNK) )
+			case Some( s1 ) => Some( (Lexer.skipLine(s), JUNK) )
 		}
 }
 
@@ -462,7 +456,20 @@ object Lexer
 		
 		loop
 	}
+	
+	def skip( s: Stream[Chr], cond: Char => Boolean ): Stream[Chr] =
+		if (!s.head.end && cond( s.head.ch ))
+			skip( s.tail, cond )
+		else
+			s
 
+	def skipLine( s: Stream[Chr] ) =
+		Lexer.skip( s, _ != '\n' ) match
+		{
+			case s if s.head.end => s
+			case s => s.tail
+		}
+	
 	private def tabs2spaces( s: String, size: Int ) =
 	{
 		require( size > 0 )
