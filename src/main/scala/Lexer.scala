@@ -6,7 +6,7 @@ import util.matching.Regex
 import collection.mutable.{HashMap, ArrayBuffer}
 
 
-class Lexer( tab: Int )
+class Lexer
 {
 	private val lexemes = new ArrayBuffer[Lexeme]
 	private val ignored = new ArrayBuffer[Lexeme]
@@ -22,9 +22,11 @@ class Lexer( tab: Int )
 		ignored += l
 	}
 	
-	def scan( r: Reader ): Stream[Token] =
+	def scan( r: Reader, tab: Int ): Stream[Token] = scan( Lexer.stream(r, tab) )
+	
+	def scan( chr: Stream[Chr] ): Stream[Token] =
 	{
-	var s = Lexer.chrStream( r, tab )
+	var s = chr
 	
 		def next: Token =
 			if (s isEmpty)
@@ -65,9 +67,7 @@ class Lexer( tab: Int )
 
 abstract class Lexeme
 {
-	protected val JUNK = Token( null, null, null )
-	
-	private val EMPTYMAP = Map.empty[String, Any]
+	protected val JUNK = Token( null, null, null, null )
 	
 	protected def skip( s: Stream[Chr], cond: Char => Boolean ): Stream[Chr] =
 		if (cond( s.head.ch ))
@@ -121,23 +121,11 @@ abstract class Lexeme
 	protected def consume( kind: Any, s: Stream[Chr], cond: Char => Boolean,
 				error: String = "invalid token",
 				matcher: Regex = null,
-				mapping: collection.Map[String, Any] = EMPTYMAP,
+				mapping: collection.Map[String, Any] = Map.empty,
 				notafter: Char => Boolean = _ => false
 				): (Stream[Chr], Token) =
 	{
-	val buf = new StringBuilder
-		
-		def _consume( c: Stream[Chr] ): Stream[Chr] =
-			if (cond( c.head.ch ))
-			{
-				buf += c.head.ch
-				_consume( c.tail )
-			}
-			else
-				c
-		
-	val s1 = _consume( s )
-	val v = buf.toString
+	val (v, s1) = consume( s, cond )
 	val (v1, s2) =
 		if (matcher eq null)
 			(v, s1)
@@ -159,8 +147,8 @@ abstract class Lexeme
 			
 		mapping.get(v1) match
 		{
-			case None => (s2, Token( kind, v1, s.head.pos ))
-			case Some( sym ) => (s2, Token( sym, v1, s.head.pos ))
+			case None => (s2, Token( kind, v1, s, s2 ))
+			case Some( sym ) => (s2, Token( sym, v1, s, s2 ))
 		}
 	}
 
@@ -213,7 +201,7 @@ abstract class Lexeme
 							}
 						case _ => _s.tail.head.pos.error( "unrecognized escape character" )
 					}
-				case `delim` => (_s.tail, Token( tok, buf.toString, s.head.pos ))
+				case `delim` => (_s.tail, Token( tok, buf.toString, s, _s.tail ))
 				case c =>
 					buf += c
 					_token( _s.tail )
@@ -246,7 +234,7 @@ object EOFLexeme extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		if (s.head.ch == EOF)
-			Some( (s.tail, Token(EOF, "<eof>", s.head.pos)) )
+			Some( (s.tail, Token(EOF, "<eof>", s, s.tail)) )
 		else
 			None
 }
@@ -368,7 +356,7 @@ class FloatingLexeme( tok: Any ) extends Lexeme
 					val d = m.group( 0 )
 					val rest = skip( s, d.length )
 					
-					Some( (rest, Token( tok, d, s.head.pos )) )
+					Some( (rest, Token( tok, d, s, rest )) )
 			}
 		}
 	}
@@ -378,7 +366,7 @@ object WhitespaceLexeme extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		if (s.head.ch.isWhitespace)
-			Some( (skip(s, _.isWhitespace), JUNK) )
+			Some( (skip(s.tail, _.isWhitespace), JUNK) )
 		else
 			None
 }
@@ -418,7 +406,7 @@ class BlockCommentLexeme( start: String, end: String ) extends Lexeme
 
 object Lexer
 {
-	def chrStream( r: Reader, tab: Int ): Stream[Chr] =
+	def stream( r: Reader, tab: Int ): Stream[Chr] =
 	{
 	val br = if (r.isInstanceOf[BufferedReader]) r.asInstanceOf[BufferedReader] else new BufferedReader( r )
 	var s = ""
@@ -510,9 +498,11 @@ class Chr( val ch: Char, val pos: Position )
 	override def toString = if (end) s"<end $pos>" else "<'" + (if (ch == '\n') "\\n" else ch) + s"' $pos>"
 }
 
-case class Token( kind: Any, s: String, pos: Position )
+case class Token( kind: Any, s: String, start: Stream[Chr], rest: Stream[Chr] )
 {
 	def end = kind == EOF
+	
+	def pos = start.head.pos
 	
 	override def toString = if (end) s"<end $pos>" else s"<[$kind] '" + s.replace( "\n", "\\n" )  + s"' $pos>"
 }

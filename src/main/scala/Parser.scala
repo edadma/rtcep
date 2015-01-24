@@ -23,7 +23,7 @@ object TestParser extends AbstractPrologParser[String]
 			s"${functor.s}(${args.map(_.v).mkString(",")})"
 }
 
-abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
+abstract class AbstractPrologParser[A] extends AbstractParser[A]
 {
 	symbols.add( ".", "[]", "[", "]", "|" )
 	add( 1000, 'xfy, "," )
@@ -35,7 +35,7 @@ abstract class AbstractPrologParser[A] extends AbstractParser[A]( 4 )
 	add(  200, 'xfy, "^" )
 }
 
-abstract class AbstractParser[A]( tabs: Int ) extends Parser[A]
+abstract class AbstractParser[A] extends Parser[A]
 {
 	protected val atoms = new AtomLexeme( 'atom )
 	protected val symbols =
@@ -45,7 +45,7 @@ abstract class AbstractParser[A]( tabs: Int ) extends Parser[A]
 		}
 		
 	override protected val lexer =
-		new Lexer( tabs )
+		new Lexer
 		{
 			add( atoms )
 			add( new StringLexeme('atom, '\'') )
@@ -72,12 +72,12 @@ abstract class Parser[A]
 		l match
 		{
 			case hd :: tl =>
-				Value( hd.tok, structure(Token(dotsym, ".", hd.tok.pos), IndexedSeq(hd, list(tok, tl, r))) )
+				Value( hd.tok, structure(Token(dotsym, ".", hd.tok.start, null), IndexedSeq(hd, list(tok, tl, r))) )
 			case Nil =>
 				if (r != null)
 					r
 				else
-					Value( tok, primary(Token(nilsym, "[]", tok.pos)) )
+					Value( tok, primary(Token(nilsym, "[]", tok.start, null)) )
 		}
 	
 	protected val atoms: KeywordLexeme
@@ -143,9 +143,11 @@ abstract class Parser[A]
 		}
 	}
 	
-	def parse( s: String, endtok: Any ): (A, Stream[Token]) = parse( new StringReader(s), endtok )
+	def parse( s: String, tabs: Int, endtok: Any ): (A, Stream[Token]) = parse( new StringReader(s), tabs, endtok )
 	
-	def parse( r: Reader, endtok: Any ): (A, Stream[Token]) =
+	def parse( r: Reader, tabs: Int, endtok: Any ): (A, Stream[Token]) = parse( Lexer.stream(r, tabs), endtok )
+	
+	def parse( chr: Stream[Chr], endtok: Any ): (A, Stream[Token]) =
 	{
 	val argstack = new ArrayStack[Value[A]]
 	
@@ -168,7 +170,7 @@ abstract class Parser[A]
 			}
 		
 	val opstack = new ArrayStack[Operation]
-	var toks = lexer.scan( r )
+	var toks = lexer.scan( chr )
  	var prev: Any = null
 	val comma: Map[Symbol, Operator] = if (opmap contains ',') null else Map( 'infix -> Operator(',', 10000, 'xfy) )
 	val bar: Map[Symbol, Operator] = if (lists == 'prolog && opmap.contains( '|' )) null else Map( 'infix -> Operator('|', 10000, 'xfx) )
@@ -273,7 +275,7 @@ abstract class Parser[A]
 							prev = tok
 							
 							if (tok.kind == 'charlist)
-								argstack push list( tok, tok.s.map( c => Value(tok, primary(Token('intsym, c.toInt.toString, tok.pos))) ).toList, null )
+								argstack push list( tok, tok.s.map( c => Value(tok, primary(Token('intsym, c.toInt.toString, tok.start, null))) ).toList, null )
 							else
 								argstack push Value( tok, primary(tok) )
 						case Some( map ) =>
@@ -341,19 +343,17 @@ abstract class Parser[A]
 		}
 		
 		while (!opstack.isEmpty)
-		{
 			opstack.pop match
 			{
 				case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
 				case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
-				case Operation(Token('(', _, pos), _, _, _) => pos.error( "syntax error: unmatched open parenthesis" )
-				case Operation(Token('[', _, pos), _, _, _) => pos.error( "syntax error: unmatched open bracket" )
+				case Operation(Token('(', _, start, _), _, _, _) => start.head.pos.error( "syntax error: unmatched open parenthesis" )
+				case Operation(Token('[', _, start, _), _, _, _) => start.head.pos.error( "syntax error: unmatched open bracket" )
 			}
-		}
 		
 		if (argstack.size > 1)
 			toks.head.pos.error( "syntax error: more than one value on stack" )
-			
+
 		(argstack.pop.v, toks)
 	}
 

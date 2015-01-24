@@ -8,12 +8,12 @@ object Main extends App
 	def parse( s: String ) =
 		try
 		{
-			TestParser.parse( s, EOF )._1
+			TestParser.parse( s, 4, '.' )
 		}
 		catch
 		{
 			case e: Exception => /*e.printStackTrace*/e.getMessage
 		}
 	
-	println( parse(""" [1, 2|Rest] """) )
+	println( parse(""" [1, 2|Rest]. """) )
 }

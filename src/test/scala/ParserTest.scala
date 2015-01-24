@@ -13,7 +13,7 @@ class ParserTest extends FreeSpec with PropertyChecks with Matchers
 	def parse( s: String ) =
 		try
 		{
-			p.parse( s )
+			p.parse( s, 4, EOF )._1
 		}
 		catch
 		{
@@ -22,8 +22,8 @@ class ParserTest extends FreeSpec with PropertyChecks with Matchers
 	
 	"basic" in
 	{
-		parse( "1+2" ) shouldBe "+(1,2)"
-		parse( "1+2*3" ) shouldBe "+(1,*(2,3))"
+		parse( "1 + 2" ) shouldBe "+(1,2)"
+		parse( "1 + 2 * 3" ) shouldBe "+(1,*(2,3))"
 		parse( "(1+2)*3" ) shouldBe "*(+(1,2),3)"
 		parse( "1+(2+3)" ) shouldBe "+(1,+(2,3))"
 		parse( "-1^2" ) shouldBe "-^(1,2)"
