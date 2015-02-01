@@ -11,7 +11,6 @@ object TestParser extends AbstractPrologParser[String]
 		value.kind match
 		{
 			case 'atom => "'" + value.s + "'"
-			case 'charlist => '"' + value.s + '"'
 			case 'string => '`' + value.s + '`'
 			case _ => value.s
 		}
@@ -44,7 +43,7 @@ abstract class AbstractParser[A] extends Parser[A]
 			add( "(", ")" )
 		}
 		
-	override protected val lexer =
+	protected val lexer =
 		new Lexer
 		{
 			add( atoms )
@@ -91,6 +90,10 @@ abstract class Parser[A]
 	
 	private val operators = new ArrayBuffer[Operator]
 	private val opmap = new HashMap[Any, Map[Symbol, Operator]]
+	
+	def scan( r: Reader, tab: Int ) = lexer.scan( r, tab )
+	
+	def scan( chr: Stream[Chr] ) = lexer.scan( chr )
 	
 	def add( prec: Int, assoc: Symbol, names: String* )
 	{
@@ -147,7 +150,9 @@ abstract class Parser[A]
 	
 	def parse( r: Reader, tabs: Int, endtok: Any ): (A, Stream[Token]) = parse( Lexer.stream(r, tabs), endtok )
 	
-	def parse( chr: Stream[Chr], endtok: Any ): (A, Stream[Token]) =
+	def parse( chr: Stream[Chr], endtok: Any ): (A, Stream[Token]) = parseTokens( scan(chr), endtok )
+	
+	def parseTokens( s: Stream[Token], endtok: Any ): (A, Stream[Token]) =
 	{
 	val argstack = new ArrayStack[Value[A]]
 	
@@ -170,7 +175,7 @@ abstract class Parser[A]
 			}
 		
 	val opstack = new ArrayStack[Operation]
-	var toks = lexer.scan( chr )
+	var toks = s
  	var prev: Any = null
 	val comma: Map[Symbol, Operator] = if (opmap contains ',') null else Map( 'infix -> Operator(',', 10000, 'xfy) )
 	val bar: Map[Symbol, Operator] = if (lists == 'prolog && opmap.contains( '|' )) null else Map( 'infix -> Operator('|', 10000, 'xfx) )

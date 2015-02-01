@@ -9,6 +9,8 @@ version := "0.1"
 
 scalaVersion := "2.11.5"
 
+isSnapshot := true
+
 scalacOptions ++= Seq( "-deprecation", "-feature", "-language:postfixOps", "-language:implicitConversions", "-language:existentials" )
 
 incOptions := incOptions.value.withNameHashing( true )
@@ -25,26 +27,6 @@ libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.3" % "test"
 
 libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.11.5" % "test"
 
-//libraryDependencies += "com.typesafe.akka" %% "akka-actor" % "2.3.6"
-
-//libraryDependencies ++= Seq(
-//	"org.scala-lang.modules" %% "scala-swing" % "1.0.1",
-//	"org.scala-lang.modules" %% "scala-parser-combinators" % "1.0.2"
-//	)
-
-//libraryDependencies += "org.scaloid" %% "scaloid" % "3.2-8"
-
-//libraryDependencies += "org.clapper" %% "argot" % "1.0.3"
-
-//libraryDependencies += "com.h2database" % "h2" % "1.3.176"
-
-libraryDependencies ++= Seq(
-//	"org.postgresql" % "postgresql" % "9.2-1004-jdbc4"
-//	"mysql" % "mysql-connector-java" % "5.1.29"
-//	"org.mongodb" %% "casbah" % "2.6.3"
-//	"org.antlr" % "stringtemplate" % "4.0.2"
-	)
-	
 //mainClass in (Compile, packageBin) := Some( "ca.hyperreal.myproject.Main" )
 
 //mainClass in (Compile, run) := Some( "ca.hyperreal.myproject.Main" )
@@ -81,12 +63,12 @@ pomIncludeRepository := { _ => false }
 
 licenses := Seq("MIT" -> url("http://opensource.org/licenses/MIT"))
 
-homepage := Some(url("https://github.com/edadma/color"))
+homepage := Some(url("https://github.com/edadma/rtcep"))
 
 pomExtra := (
   <scm>
-    <url>git@github.com:edadma/color.git</url>
-    <connection>scm:git:git@github.com:edadma/color.git</connection>
+    <url>git@github.com:edadma/rtcep.git</url>
+    <connection>scm:git:git@github.com:edadma/rtcep.git</connection>
   </scm>
   <developers>
     <developer>
