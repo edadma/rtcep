@@ -17,6 +17,7 @@ object TestParser extends AbstractParser[String]
 	add(  400, 'yfx, "*", "/" )
 	add(  100, 'yf,  "!" )
 	add(  200,  'fy, "+", "-" )
+	add(  200, 'xfx, "**" )
 	add(  200, 'xfy, "^" )
 	
 	def primary( value: Token ) =
@@ -378,6 +379,12 @@ abstract class Parser[A]
 		
 		if (argstack.size > 1)
 			toks.head.pos.error( "syntax error: more than one value on stack" )
+		
+		if (argstack.isEmpty)
+			if (toks.head.end)
+				toks.head.pos.error( "syntax error: empty input" )
+			else
+				toks.head.pos.error( "syntax error: empty stack" )
 
 		(argstack.pop.v, toks)
 	}
