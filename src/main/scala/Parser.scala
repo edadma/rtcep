@@ -7,16 +7,21 @@ import collection.mutable.{ArrayBuffer, ArrayStack, HashMap}
 
 object TestParser extends AbstractParser[String]
 {
-	symbols.add( ".", "[]", "[", "]", "|" )
-	add( 1200, 'xfx, ":-" )
+	symbols.add( ".", "[]", "[", "]", "|", "!" )
+	symbols exempt "!"
+	add( 1200, 'xfx, ":-", "-->" )
+	add( 1200,  'fx, ":-", "?-" )
 	add( 1100, 'xfy, ";" )
 	add( 1050, 'xfy, "->" )
 	add( 1000, 'xfy, "," )
-	add(  700, 'xfx, "=:=", "=\\=", ">", ">=", "<", "=<", "=", "\\=", "==", "=..", "is" )
+	add(  900,  'fy, "\\+" )
+	add(  700, 'xfx, "=", "\\=" )
+	add(  700, 'xfx, "==", "\\==" )
+	add(  700, 'xfx, "=.." )
+	add(  700, 'xfx, "is", "=:=", "=\\=", ">", ">=", "<", "=<" )
 	add(  500, 'yfx, "+", "-" )
 	add(  400, 'yfx, "*", "/" )
-	add(  100, 'yf,  "!" )
-	add(  200,  'fy, "+", "-" )
+	add(  200,  'fy, "-", "\\" )
 	add(  200, 'xfx, "**" )
 	add(  200, 'xfy, "^" )
 	
@@ -37,7 +42,8 @@ object TestParser extends AbstractParser[String]
 
 abstract class AbstractPrologParser[A] extends AbstractParser[A]
 {
-	symbols.add( ".", "[]", "[", "]", "|" )
+	symbols.add( ".", "[]", "[", "]", "|", "!" )
+	symbols exempt "!"
 	add( 1200, 'xfx, ":-", "-->" )
 	add( 1200,  'fx, ":-", "?-" )
 	add( 1100, 'xfy, ";" )
@@ -111,6 +117,10 @@ abstract class Parser[A]
 	
 	private val operators = new ArrayBuffer[Operator]
 	private val opmap = new HashMap[Any, Map[Symbol, Operator]]
+	
+	def operatorSet = opmap.keySet
+	
+	def operator( tok: Any ) = opmap(tok)
 	
 	def scan( r: Reader, tab: Int ) = lexer.scan( r, tab )
 	

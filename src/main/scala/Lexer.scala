@@ -242,7 +242,7 @@ trait KeywordLexeme
 
 class SymbolLexeme( tok: Any ) extends Lexeme with KeywordLexeme
 {
-	private val nonsymbol = (('\u0000' to ' ') ++ ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toSet
+	private val nonsymbol = (('\u0000' to ' ') ++ ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toSet + '_'
 	private val symbols = new HashMap[String, Any]
 	private var regex: Regex = null
 	
@@ -266,6 +266,11 @@ class SymbolLexeme( tok: Any ) extends Lexeme with KeywordLexeme
 		}
 		
 		regex = (symbols.keys.toSeq.sortWith( _ > _ ).map( Regex.quote ).mkString( "|" ) + "|.*").r
+	}
+	
+	def exempt( sym: String )
+	{
+		symbols(sym) = tok
 	}
 	
 	def token( s: Stream[Chr] ) =

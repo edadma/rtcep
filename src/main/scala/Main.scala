@@ -15,5 +15,5 @@ object Main extends App
 			case e: Exception => /*e.printStackTrace*/e.getMessage
 		}
 	
-	println( parse("") )
+	println( parse("1+2, !.") )
 }
