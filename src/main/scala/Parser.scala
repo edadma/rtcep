@@ -222,7 +222,7 @@ abstract class Parser[A]
 			{
 				case '[' =>
 					if (prev.isInstanceOf[Token])
-						prev.asInstanceOf[Token].pos.error( "syntax error: expected operator" )
+						tok.pos.error( s"syntax error: ${tok.s} unexpected" )
 					else
 						opstack push Operation( tok, 10000, null, 'lst )
 						
@@ -232,7 +232,7 @@ abstract class Parser[A]
 						if (prev.asInstanceOf[Token].kind == 'atom)
 							opstack push Operation( tok, 10000, null, 'lst )
 						else
-							prev.asInstanceOf[Token].pos.error( "syntax error: expected atom or operator" )
+							tok.pos.error( s"syntax error: ${tok.s} unexpected" )
 					else
 						opstack push Operation( tok, 10000, null, 'lparen )
 						
@@ -361,7 +361,7 @@ abstract class Parser[A]
 							}
 							else if (op.tok.kind == ',' && !opstack.isEmpty && opstack.top.fixity == 'lst)
 								if (opstack.top.restflag)
-									op.tok.pos.error( "syntax error: comma not expected" )
+									op.tok.pos.error( "syntax error: comma unexpected" )
 								else
 									opstack.top.buf += argstack.pop
 							else if (op.fixity == 'postfix)
