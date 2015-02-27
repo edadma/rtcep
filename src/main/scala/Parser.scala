@@ -120,7 +120,7 @@ abstract class Parser[A]
 	
 	def operatorSet = opmap.keySet
 	
-	def operator( tok: Any ) = opmap(tok)
+	def operator( tok: Any ) = opmap.get(tok)
 	
 	def scan( r: Reader, tab: Int ) = lexer.scan( r, tab )
 	
@@ -129,6 +129,7 @@ abstract class Parser[A]
 	def add( prec: Int, assoc: Symbol, names: String* )
 	{
 		require( prec > 0, "precedence is positive" )
+		require( prec <= 1200, "highest precedence is 1200" )
 		require( Set('xf, 'yf, 'fx, 'fy, 'xfx, 'xfy, 'yfx) contains assoc, "invalid associativity: " + assoc )
 	
 		for (name <- names)
@@ -359,7 +360,10 @@ abstract class Parser[A]
 								opstack.top.buf += argstack.pop
 							}
 							else if (op.tok.kind == ',' && !opstack.isEmpty && opstack.top.fixity == 'lst)
-								opstack.top.buf += argstack.pop
+								if (opstack.top.restflag)
+									op.tok.pos.error( "syntax error: comma not expected" )
+								else
+									opstack.top.buf += argstack.pop
 							else if (op.fixity == 'postfix)
 								argstack push Value( op.tok, structure( op.tok, pop1(op.tok) ) )
 							else if (opstack.isEmpty || opstack.top.tok.kind == '(' ||
@@ -398,10 +402,6 @@ abstract class Parser[A]
 
 		(argstack.pop.v, toks)
 	}
-
-	case class Operator( tok: Any, prec: Int, assoc: Symbol )
-
-	case class Value[A]( tok: Token, v: A )
 	
 	case class Operation( tok: Token, prec: Int, assoc: Symbol, fixity: Symbol )
 	{
@@ -410,3 +410,7 @@ abstract class Parser[A]
 		var rest: Value[A] = null
 	}
 }
+
+case class Operator( tok: Any, prec: Int, assoc: Symbol )
+
+case class Value[A]( tok: Token, v: A )

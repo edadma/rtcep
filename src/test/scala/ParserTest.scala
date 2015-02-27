@@ -28,13 +28,23 @@ class ParserTest extends FreeSpec with PropertyChecks with Matchers
 		parse( "1+(2+3)" ) shouldBe "+(1,+(2,3))"
 		parse( "-1^2" ) shouldBe "-^(1,2)"
 		parse( "1^-2" ) shouldBe "^(1,-2)"
-		parse( "1!" ) shouldBe "!1"
-		parse( "-1!" ) shouldBe "-!1"
+// 		parse( "1!" ) shouldBe "!1"
+// 		parse( "-1!" ) shouldBe "-!1"
 	}
 	
 	"errors" in
 	{
 		parse( "1 2" ) shouldBe "syntax error: expected operator"
+	}
+	
+	"lists" in
+	{
+		parse( "[1, 2, 3]" ) shouldBe ".(1,.(2,.(3,[])))"
+		parse( "[1]" ) shouldBe ".(1,[])"
+		parse( "[1, 2, 3|A]" ) shouldBe ".(1,.(2,.(3,A)))"
+		parse( "[1|A]" ) shouldBe ".(1,A)"
+		parse( "[1|[2]]" ) shouldBe ".(1,.(2,[]))"
+		parse( "[1|A, B]" ) should startWith ("syntax error: comma not expected")
 	}
 	
 	"comments" in
