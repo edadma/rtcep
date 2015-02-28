@@ -7,7 +7,9 @@ import collection.mutable.{ArrayBuffer, ArrayStack, HashMap}
 
 object TestParser extends AbstractParser[String]
 {
-	symbols.add( ".", "[]", "[", "]", "|", "!" )
+	protected val lists = 'prolog
+	
+	symbols.add( ".", "[", "]", "|", "!" )
 	symbols exempt "!"
 	add( 1200, 'xfx, ":-", "-->" )
 	add( 1200,  'fx, ":-", "?-" )
@@ -42,7 +44,9 @@ object TestParser extends AbstractParser[String]
 
 abstract class AbstractPrologParser[A] extends AbstractParser[A]
 {
-	symbols.add( ".", "[]", "[", "]", "|", "!" )
+	protected val lists = 'prolog
+	
+	symbols.add( ".", "[", "]", "|", "!" )
 	symbols exempt "!"
 	add( 1200, 'xfx, ":-", "-->" )
 	add( 1200,  'fx, ":-", "?-" )
@@ -93,7 +97,7 @@ abstract class Parser[A]
 	protected def primary( value: Token ): A
 	
 	protected def structure( functor: Token, args: IndexedSeq[Value[A]] ): A
-							
+
 	protected def list( tok: Token, l: List[Value[A]], r: Value[A] ): Value[A] =
 		l match
 		{
@@ -113,7 +117,7 @@ abstract class Parser[A]
 	protected val dotsym = Symbol( "." )
 	protected val nilsym = Symbol( "[]" )
 	protected val intsym = 'integer
-	protected val lists = 'prolog // 'basic // 'none
+	protected val lists: Symbol// = 'prolog // 'basic // 'none
 	
 	private val operators = new ArrayBuffer[Operator]
 	private val opmap = new HashMap[Any, Map[Symbol, Operator]]
@@ -220,7 +224,7 @@ abstract class Parser[A]
 
 			tok.kind match
 			{
-				case '[' =>
+				case '[' if lists != 'none =>
 					if (prev.isInstanceOf[Token])
 						tok.pos.error( s"syntax error: ${tok.s} unexpected" )
 					else
@@ -237,35 +241,41 @@ abstract class Parser[A]
 						opstack push Operation( tok, 10000, null, 'lparen )
 						
 					prev = null
-				case ']' =>
-					if (prev == null || prev.isInstanceOf[Operation] &&
-						(prev.asInstanceOf[Operation].fixity == 'infix || prev.asInstanceOf[Operation].fixity == 'prefix))
-						tok.pos.error( "syntax error: unexpected closing bracket" )
-						
-					while (!opstack.isEmpty && opstack.top.tok.kind != '[')
+				case ']' if lists != 'none =>
+					if (prev == null)
 					{
+						opstack.pop
+						argstack push list( tok, Nil, null )
+					}
+					else
+					{
+						if (prev.isInstanceOf[Operation] &&
+							(prev.asInstanceOf[Operation].fixity == 'infix || prev.asInstanceOf[Operation].fixity == 'prefix))
+							tok.pos.error( "syntax error: unexpected closing bracket" )
+							
+						while (!opstack.isEmpty && opstack.top.tok.kind != '[')
+							opstack.pop match
+							{
+								case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
+								case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
+							}
+
+						if (opstack.isEmpty)
+							tok.pos.error( "syntax error: unmatched closing bracket" )
+						
 						opstack.pop match
 						{
-							case Operation(optok, _, _, 'prefix) => argstack push Value( optok, structure( optok, pop1(optok) ) )
-							case Operation(optok, _, _, 'infix) => argstack push Value( optok, structure( optok, pop2(optok) ) )
+							case o@Operation(optok, _, _, 'lst) =>
+								if (o.restflag)
+									o.rest = pop( optok )
+								else
+									o.buf += pop( optok )
+								
+								argstack push list( tok, o.buf.toList, o.rest )
+							case _ =>
 						}
 					}
-
-					if (opstack.isEmpty)
-						tok.pos.error( "syntax error: unmatched closing bracket" )
 					
-					opstack.pop match
-					{
-						case o@Operation(optok, _, _, 'lst) =>
-							if (o.restflag)
-								o.rest = pop( optok )
-							else
-								o.buf += pop( optok )
-							
-							argstack push list( tok, o.buf.toList, o.rest )
-						case _ =>
-					}
-
 					prev = tok
 				case ')' =>
 					if (prev == null || prev.isInstanceOf[Operation] &&
