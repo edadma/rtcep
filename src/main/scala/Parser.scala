@@ -59,7 +59,7 @@ abstract class AbstractPrologParser[A] extends AbstractParser[A]
 	add(  700, 'xfx, "=.." )
 	add(  700, 'xfx, "is", "=:=", "=\\=", ">", ">=", "<", "=<" )
 	add(  500, 'yfx, "+", "-" )
-	add(  400, 'yfx, "*", "/" )
+	add(  400, 'yfx, "*", "/", "mod" )
 	add(  200,  'fy, "-", "\\" )
 	add(  200, 'xfx, "**" )
 	add(  200, 'xfy, "^" )
