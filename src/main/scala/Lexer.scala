@@ -1,4 +1,4 @@
-package ca.hyperreal.rtcep
+package xyz.hyperreal.rtcep
 
 import java.io._
 
@@ -318,7 +318,7 @@ class VariableLexeme( tok: Any ) extends Lexeme
 }
 
 class StringLexeme( tok: Any, delim: Char ) extends Lexeme
-{	
+{
 	def token( s: Stream[Chr] ) =
 		if (s.head.ch == delim)
 			Some( consume(tok, s.tail, delim) )

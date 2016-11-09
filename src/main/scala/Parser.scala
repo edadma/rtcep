@@ -1,4 +1,4 @@
-package ca.hyperreal.rtcep
+package xyz.hyperreal.rtcep
 
 import java.io.{Reader, StringReader}
 

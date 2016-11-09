@@ -1,11 +1,8 @@
-import AssemblyKeys._
-
-
 name := "rtcep"
 
-version := "0.1"
+version := "0.2"
 
-scalaVersion := "2.11.6"
+scalaVersion := "2.11.8"
 
 isSnapshot := true
 
@@ -13,7 +10,7 @@ scalacOptions ++= Seq( "-deprecation", "-feature", "-language:postfixOps", "-lan
 
 incOptions := incOptions.value.withNameHashing( true )
 
-organization := "ca.hyperreal"
+organization := "xyz.hyperreal"
 
 //resolvers += Resolver.sonatypeRepo( "snapshots" )
 
@@ -21,23 +18,16 @@ resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/release
 
 resolvers += "Hyperreal Repository" at "http://hyperreal.ca/maven2"
 
-libraryDependencies += "org.scalatest" %% "scalatest" % "2.1.3" % "test"
+libraryDependencies ++= Seq(
+	"org.scalatest" %% "scalatest" % "3.0.0" % "test",
+	"org.scalacheck" %% "scalacheck" % "1.13.2" % "test"
+)
 
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.11.5" % "test"
+mainClass in (Compile, run) := Some( "xyz.hyperreal." + name.value + ".Main" )
 
-//mainClass in (Compile, packageBin) := Some( "ca.hyperreal.myproject.Main" )
+mainClass in assembly := Some( "xyz.hyperreal." + name.value + ".Main" )
 
-//mainClass in (Compile, run) := Some( "ca.hyperreal.myproject.Main" )
-
-//offline := true
-
-assemblySettings
-
-mainClass in assembly := Some( "ca.hyperreal.myproject.Main" )
-
-jarName in assembly := name.value + "-" + version.value + ".jar"
-
-seq(bintraySettings:_*)
+assemblyJarName in assembly := name.value + "-" + version.value + ".jar"
 
 
 publishMavenStyle := true
