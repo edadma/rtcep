@@ -2,7 +2,7 @@ name := "rtcep"
 
 version := "0.2"
 
-scalaVersion := "2.11.8"
+scalaVersion := "2.12.0"
 
 isSnapshot := true
 
@@ -20,7 +20,7 @@ resolvers += "Hyperreal Repository" at "http://hyperreal.ca/maven2"
 
 libraryDependencies ++= Seq(
 	"org.scalatest" %% "scalatest" % "3.0.0" % "test",
-	"org.scalacheck" %% "scalacheck" % "1.13.2" % "test"
+	"org.scalacheck" %% "scalacheck" % "1.13.4" % "test"
 )
 
 mainClass in (Compile, run) := Some( "xyz.hyperreal." + name.value + ".Main" )

@@ -240,9 +240,9 @@ trait KeywordLexeme
 	def add( keys: String* )
 }
 
-class SymbolLexeme( tok: Any ) extends Lexeme with KeywordLexeme
+class SymbolLexeme( tok: Any, otherNonsymbols: Seq[Char] = List('_') ) extends Lexeme with KeywordLexeme
 {
-	private val nonsymbol = (('\u0000' to ' ') ++ ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toSet + '_'
+	private val nonsymbol = (('\u0000' to ' ') ++ ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9')).toSet ++ otherNonsymbols
 	private val symbols = new HashMap[String, Any]
 	private var regex: Regex = null
 	
@@ -305,6 +305,17 @@ class AtomLexeme( tok: Any ) extends Lexeme with KeywordLexeme
 			None
 }
 
+class NameLexeme( tok: Any ) extends Lexeme
+{
+	private val identifier = (('a' to 'z') ++ ('A' to 'Z')).toSet
+	
+	def token( s: Stream[Chr] ) =
+		if (identifier(s.head.ch))
+			Some( consume(tok, s, identifier(_)) )
+		else
+			None
+}
+
 class VariableLexeme( tok: Any ) extends Lexeme
 {
 	private val variableStart = ('A' to 'Z').toSet + '_'
@@ -326,11 +337,11 @@ class StringLexeme( tok: Any, delim: Char ) extends Lexeme
 			None
 }
 
-class IntegerLexeme( tok: Any ) extends Lexeme
+class IntegerLexeme( tok: Any, notafterPred: Char => Boolean = (('a' to 'z') ++ ('A' to 'Z')).toSet + '_' ) extends Lexeme
 {
 	def token( s: Stream[Chr] ) =
 		if (s.head.ch.isDigit)
-			Some( consume(tok, s, _.isDigit, error = "invalid integer literal", notafter = c => c.isLetter || c == '_') )
+			Some( consume(tok, s, _.isDigit, error = "invalid integer literal", notafter = notafterPred) )
 		else
 			None
 }
