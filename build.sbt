@@ -1,8 +1,10 @@
 name := "rtcep"
 
-version := "0.2"
+version := "0.3"
 
-scalaVersion := "2.12.0"
+scalaVersion := "2.12.1"
+
+crossScalaVersions := Seq( "2.11.8" )
 
 isSnapshot := true
 
